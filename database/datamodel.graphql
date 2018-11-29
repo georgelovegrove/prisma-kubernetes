@@ -1,0 +1,8 @@
+# Users
+
+type User {
+  id: ID! @unique
+  email: String @unique
+  firstName: String!
+  lastName: String!
+}

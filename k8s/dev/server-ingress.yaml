@@ -1,0 +1,26 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: server-ingress-service
+  annotations:
+    ingress.kubernetes.io/secure-backends: 'true'
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    certmanager.k8s.io/cluster-issuer: 'letsencrypt-prod'
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '1800'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '1800'
+    kubernetes.io/tls-acme: 'true'
+spec:
+  tls:
+    - hosts:
+        - <API_DOMAIN>
+      secretName: <DOMAIN_SECRET_NAME>
+  rules:
+    - host: <API_DOMAIN>
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: server-service
+              servicePort: 4000

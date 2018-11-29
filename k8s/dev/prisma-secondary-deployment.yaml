@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secondary-prisma-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prisma-secondary
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+       labels:
+          app: prisma-secondary
+    spec:
+      containers:
+        - name: prisma-secondary
+          image: prismagraphql/prisma-prod:1.19.3
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          env:
+            - name: JAVA_OPTS
+              value: -Xmx358m
+            - name: PRISMA_CONFIG
+              valueFrom:
+                configMapKeyRef:
+                  name: prisma-secondary-configmap
+                  key: PRISMA_CONFIG
+        - name: cloudsql-proxy
+          image: gcr.io/cloudsql-docker/gce-proxy:1.11
+          env:
+            - name: SQL_INSTANCE
+              valueFrom:
+                configMapKeyRef:
+                  name: prisma-secondary-configmap
+                  key: SQL_INSTANCE
+          command: ["/cloud_sql_proxy",
+            "-credential_file=/secrets/cloudsql/credentials.json"]
+          args: ["$(SQL_INSTANCE)"]
+          securityContext:
+            runAsUser: 2  # non-root user
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: cloudsql-instance-credentials
+              mountPath: /secrets/cloudsql
+              readOnly: true
+      volumes:
+        - name: cloudsql-instance-credentials
+          secret:
+            secretName: cloudsql-instance-credentials

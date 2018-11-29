@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prisma-primary-configmap
+data:
+  SQL_INSTANCE: "<GOOGLE_CLOUD_SQL_INSTANCE>"
+  PRISMA_CONFIG: |
+    port: 5000
+    managementApiSecret: <MANAGEMENT_SECRET>
+    enableManagementApi: true
+    rabbitUri: amqp://<RABBITMQ_USER>:<RABBITMQ_PASSWORD>@rabbit-cluster-rabbitmq:5672
+    databases:
+      default:
+        connector: postgres
+        host: 127.0.0.1
+        port: 5432
+        user: <POSTGRES_USER>
+        password: <POSTGRES_PASSWORD>
+        migrations: true
+        database: <DATABASE_NAME>

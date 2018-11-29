@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: server
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        name: server
+    spec:
+      containers:
+        - name: server
+          image: <DOCKER_SERVER_IMAGE>
+          ports:
+            - containerPort: 4000
+          resources:
+            limits:
+              memory: 400Mi
+            requests:
+              memory: 200Mi
+          env:
+            - name: PRISMA_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: prisma-endpoint
+                  key: PRISMA_ENDPOINT
+            - name: PRISMA_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: prisma-secret
+                  key: PRISMA_SECRET
+            - name: APOLLO_ENGINE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: apollo-engine-key
+                  key: APOLLO_ENGINE_KEY
+            - name: APP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: APP_SECRET
+      imagePullSecrets:
+      - name: regcred

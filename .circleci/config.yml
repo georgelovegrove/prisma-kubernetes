@@ -1,0 +1,73 @@
+version: 2
+jobs:
+  prod-docker-build:
+    docker:
+      - image: node:10.12.0-jessie
+    steps:
+      - checkout
+
+      # Get the node_modules cache and update after install
+      - restore_cache:
+          key: dependency-cache-{{ checksum "package.json" }}
+      - run: npm install
+      - save_cache:
+          key: dependency-cache-{{ checksum "package.json" }}
+          paths:
+            - ./node_modules
+
+      # Required for Docker setup
+      - setup_remote_docker:
+          docker_layer_caching: true
+
+      # Install Docker client
+      - run: |
+          set -x
+          VER="17.03.0-ce"
+          curl -L -o /tmp/docker-$VER.tgz https://download.docker.com/linux/static/stable/x86_64/docker-$VER.tgz
+          tar -xz -C /tmp -f /tmp/docker-$VER.tgz
+          mv /tmp/docker/* /usr/bin
+
+      # Build and push Docker image
+      - run: |
+          echo "${SERVER_IMAGE}:${CIRCLE_SHA1}" > full_docker_image_name
+          FULL_DOCKER_IMAGE_NAME=$(cat full_docker_image_name)
+          echo $FULL_DOCKER_IMAGE_NAME
+          LATEST_DOCKER_IMAGE_NAME=$(echo "${SERVER_IMAGE}:latest")
+          docker build -t $LATEST_DOCKER_IMAGE_NAME -t $FULL_DOCKER_IMAGE_NAME .
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+          docker push $FULL_DOCKER_IMAGE_NAME
+  prod-deploy:
+    docker:
+      - image: google/cloud-sdk
+    environment:
+      CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+    steps:
+      - checkout
+
+      # Log into Google Cloud using the SDK
+      - run: |
+          echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
+          gcloud --quiet config set project ${GOOGLE_PROJECT_ID}
+          gcloud --quiet config set compute/zone ${GOOGLE_COMPUTE_ZONE}
+          gcloud container clusters get-credentials ${CLUSTER_NAME}
+
+      - run: kubectl apply -f k8s/prod
+
+      - run: |
+          FULL_DOCKER_IMAGE_NAME=$(echo "${SERVER_IMAGE}:${CIRCLE_SHA1}")
+          echo $FULL_DOCKER_IMAGE_NAME
+          kubectl set image deployments/server-deployment server=${FULL_DOCKER_IMAGE_NAME}
+workflows:
+  version: 2
+  build-test-and-deploy:
+    jobs:
+      - prod-docker-build:
+          filters:
+            branches:
+              only: master
+      - prod-deploy:
+          filters:
+            branches:
+              only: master
+          requires:
+            - prod-docker-build
